@@ -1,0 +1,14 @@
+{
+  "name": "सहायक Grid",
+  "short_name": "सहायक",
+  "description": "Offline-first civic schemes PWA — Hindi-first",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "lang": "hi",
+  "background_color": "#f7f5ef",
+  "theme_color": "#14532d",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

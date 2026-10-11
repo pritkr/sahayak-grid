@@ -1,0 +1,89 @@
+---
+import { SCHEMES } from '../data/schemes.js';
+import { buildAlerts, groupByTier } from '../lib/deadlines.js';
+
+// Build-time snapshot (offline fallback); the inline script re-fetches
+// /api/alerts live and re-renders so tiers are always computed for *today*.
+const snapshot = groupByTier(buildAlerts(SCHEMES));
+const order = ['critical', 'soon', 'open', 'expired'] as const;
+const head: Record<string, string> = {
+  critical: '🔴 तुरंत — 7 दिन या कम',
+  soon: '🟡 जल्द — 30 दिन के भीतर',
+  open: '🟢 खुला — समय है',
+  expired: '⚫ समय समाप्त',
+};
+const title = '⏰ समय-सीमा अलर्ट — सहायक Grid';
+---
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#14532d" />
+<style>
+:root{--bg:#f7f5ef;--fg:#1a1a1a;--card:#ffffff;--brand:#166534;--line:#e2ddd0}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding:12px 16px 96px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+button{min-height:48px;font-size:1rem;border-radius:12px;background:var(--brand);color:#fff;border:0;padding:12px 18px;cursor:pointer;font-weight:700;width:100%}
+button.ghost{background:transparent;color:var(--brand);border:2px solid var(--brand)}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:.85rem;font-weight:700}
+.u-urgent{background:#fef3c7;color:#92400e}.u-soon{background:#dcfce7;color:#166534}.u-over{background:#fee2e2;color:#991b1b}.u-ok{background:#e0e7ff;color:#3730a3}
+footer.nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex}
+footer.nav a{flex:1;text-align:center;padding:14px 4px;min-height:48px;text-decoration:none;color:var(--fg);font-weight:700}
+.skip{position:absolute;left:-9999px}.skip:focus{left:8px;top:8px;background:#fff;padding:12px;z-index:99}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">मुख्य सामग्री पर जाएँ</a>
+<div class="wrap" id="main">
+<h1>⏰ समय-सीमा अलर्ट</h1>
+<p>सबसे ज़रूरी पहले — TTS भी <em>urgent-first</em> क्रम में पढ़ता है। <span id="liveTag" role="status"></span></p>
+<button id="speakUrgent" type="button">🔊 ज़रूरी अलर्ट सुनें (urgent पहले)</button>
+<div id="groups">
+{order.map((t) => (
+<section class="card" data-tier={t} aria-label={head[t]}>
+<h2>{head[t]} ({snapshot[t].length})</h2>
+{snapshot[t].length === 0 && <p>इस श्रेणी में कोई योजना नहीं।</p>}
+{snapshot[t].map((a) => (
+<article style="border-top:1px solid var(--line);padding:8px 0">
+<h3 style="margin:.2em 0">{a.name_hi}</h3>
+<p><span class="badge">{a.tier_hi}</span> <small>अंतिम तिथि: {a.deadline}{a.window ? ` • ${a.window}` : ''}</small></p>
+</article>
+))}
+</section>
+))}
+</div>
+</div>
+<footer class="nav" aria-label="नीचे नेविगेशन">
+<a href="/">🏠 होम</a><a href="/alerts">⏰ अलर्ट</a><a href="/stats">📊 आँकड़े</a>
+</footer>
+<script id="seed" type="application/json" set:html={JSON.stringify(SCHEMES)} />
+<script>
+'use strict';
+const SEED = JSON.parse(document.getElementById('seed').textContent);
+const HEAD = { critical:'🔴 तुरंत — 7 दिन या कम', soon:'🟡 जल्द — 30 दिन के भीतर', open:'🟢 खुला — समय है', expired:'⚫ समय समाप्त' };
+const ORDER = ['critical','soon','open','expired'];
+function daysLeft(d){ const dl=new Date(d+'T23:59:59'); const s=(x)=>{ const t=new Date(x); return new Date(t.getFullYear(),t.getMonth(),t.getDate()).getTime(); }; return Math.round((s(dl)-s(Date.now()))/864e5); }
+function tier(d){ if(d===null) return 'open'; if(d<0) return 'expired'; if(d<=7) return 'critical'; if(d<=30) return 'soon'; return 'open'; }
+function hi(t,d){ if(t==='expired') return 'समय समाप्त'; if(d===null) return 'तिथि जल्द घोषित होगी'; if(t==='critical') return 'सिर्फ '+d+' दिन बचे!'; return d+' दिन बचे'; }
+function alerts(list){ return list.map(s=>{ const dl=(s.deadline||'').trim()||null; const d=dl?daysLeft(dl):null; const t=tier(d); return { id:s.id, name:s.name_hi, deadline:dl||'—', window:s.window||'', days:d, tier:t, label:hi(t,d) }; }).sort((a,b)=>ORDER.indexOf(a.tier)-ORDER.indexOf(b.tier)||((a.days??1e9)-(b.days??1e9))); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function render(list){ const g={critical:[],soon:[],open:[],expired:[]}; for(const a of alerts(list)) g[a.tier].push(a);
+  document.getElementById('groups').innerHTML = ORDER.map(t=>'<section class="card"><h2>'+HEAD[t]+' ('+g[t].length+')</h2>'+(g[t].length?g[t].map(a=>'<article style="border-top:1px solid var(--line);padding:8px 0"><h3 style="margin:.2em 0">'+esc(a.name)+'</h3><p><span class="badge">'+esc(a.label)+'</span> <small>अंतिम तिथि: '+esc(a.deadline)+(a.window?' • '+esc(a.window):'')+'</small></p></article>').join(''):'<p>इस श्रेणी में कोई योजना नहीं।</p>')+'</section>').join('');
+  return g; }
+let current = render(SEED);
+async function live(){ try{ const r=await fetch('/api/alerts'); if(!r.ok) throw 0; const j=await r.json();
+    const list=j.alerts.map(a=>({id:a.scheme_id,name_hi:a.name_hi,deadline:a.deadline,window:a.window})); current=render(list);
+    document.getElementById('liveTag').textContent='✅ लाइव API से (आज की तिथि अनुसार)'; }catch(e){ document.getElementById('liveTag').textContent='○ ऑफ़लाइन — सीड स्नैपशॉट दिख रहा है'; } }
+function speak(t){ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.lang='hi-IN'; const v=speechSynthesis.getVoices().find(v=>v.lang&&v.lang.startsWith('hi')); if(v) u.voice=v; speechSynthesis.speak(u); }catch(e){ alert(t); } }
+// TTS urgent-first: critical → soon → open, skipping expired.
+document.getElementById('speakUrgent').onclick=()=>{ const seq=[...current.critical,...current.soon,...current.open];
+  if(!seq.length){ speak('कोई सक्रिय अलर्ट नहीं है।'); return; }
+  speak(seq.map(a=>a.name+'. '+a.label+'. अंतिम तिथि '+a.deadline).join('। ') + '।'); };
+live();
+</script>
+</body>
+</html>
