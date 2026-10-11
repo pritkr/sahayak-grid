@@ -1,0 +1,23 @@
+{
+  "name": "sahayak-grid",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sahayak Grid — offline-first civic PWA kit (Hindi-first). Astro + Hono + Supabase.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "check": "bun check",
+    "typecheck": "bun check",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "api:dev": "bun run --hot api/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "astro": "^7.3.8",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
